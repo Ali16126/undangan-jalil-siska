@@ -132,6 +132,31 @@
   footer .names{font-family:var(--serif);font-style:italic;font-size:2.4rem;color:var(--rose-deep);margin-top:24px}
   footer .sal{margin-top:26px;font-size:.95rem;color:var(--ink-soft)}
 
+  /* ===== Tombol Musik Melayang ===== */
+  .btn-music {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--rose-deep);
+    border: 2px solid var(--paper);
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(168,99,111,.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: spin 4s linear infinite;
+  }
+  .btn-music.paused {
+    animation: none;
+    opacity: 0.6;
+  }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+
   /* animasi: hanya satu momen, saat undangan dibuka */
   #content.show .hero > *{animation:rise .9s ease both}
   #content.show .hero > *:nth-child(2){animation-delay:.1s}
@@ -244,8 +269,12 @@
   </footer>
 </main>
 
+<!-- ===== Elemen Audio & Tombol Musik ===== -->
+<audio id="bg-music" loop preload="auto"></audio>
+<button id="btn-music" class="btn-music" style="display:none;" aria-label="Putar atau jeda musik">🎵</button>
+
 <script>
-  // 1. GANTI TULISAN DI BAWAH INI DENGAN URL WEB APP DARI GOOGLE SCRIPT!
+  // Link API dari Google Script
   const scriptUrl = "https://script.google.com/macros/s/AKfycbyrRgUJtaCBA43XeTmnvbYQO8YKo0c-KjrQ6qf5xp-YTX3XLxaa_bQdEQjQxF2zOFzy/exec";
 
   const btnOpen = document.getElementById('btn-open');
@@ -254,7 +283,7 @@
   fetch(scriptUrl)
     .then(response => response.json())
     .then(CFG => {
-      
+
       // Ambil parameter '?to=Nama+Tamu' dari URL
       const urlParams = new URLSearchParams(window.location.search);
       const tamu = urlParams.get('to');
@@ -264,6 +293,9 @@
 
       const $ = id => document.getElementById(id);
       const txt = (id, v) => { const el = $(id); if (el) el.textContent = v || ''; };
+
+      // Judul tab browser
+      if (CFG.judul_halaman) document.title = CFG.judul_halaman;
 
       // Mengisi Teks
       txt('cv-pria', CFG.pria_panggilan);   txt('cv-wanita', CFG.wanita_panggilan);
@@ -307,7 +339,30 @@
         c.style.backgroundImage = 'url("' + CFG.cover_foto.replace(/"/g, '%22') + '")';
       }
 
-      // Aktifkan Tombol Buka Undangan
+      // ===== Musik =====
+      // Link Google Drive sudah diubah otomatis oleh Apps Script (toAudioUrl_)
+      const music = $('bg-music');
+      const btnMusic = $('btn-music');
+      if (CFG.musik_url) {
+        music.src = CFG.musik_url;
+        music.load();
+      }
+
+      // Tombol musik: play / pause (didaftarkan sekali saja)
+      btnMusic.addEventListener('click', function () {
+        if (music.paused) {
+          music.play().then(function () {
+            btnMusic.classList.remove('paused');
+          }).catch(function (e) {
+            console.log('Musik gagal diputar:', e);
+          });
+        } else {
+          music.pause();
+          btnMusic.classList.add('paused');
+        }
+      });
+
+      // Aktifkan Tombol Buka Undangan & Putar Musik
       btnOpen.textContent = "Buka Undangan";
       btnOpen.addEventListener('click', function () {
         $('cover').classList.add('hide');
@@ -315,6 +370,15 @@
         document.body.classList.remove('locked');
         window.scrollTo(0, 0);
         setTimeout(function () { $('cover').style.display = 'none'; }, 1400);
+
+        // Tombol musik hanya muncul kalau musik_url terisi
+        if (CFG.musik_url) {
+          btnMusic.style.display = 'flex';
+          music.play().catch(function (e) {
+            console.log('Musik tertahan oleh browser:', e);
+            btnMusic.classList.add('paused');
+          });
+        }
       });
 
       // Hitung Mundur
